@@ -10,10 +10,11 @@ export default function ReplyTab({ style }) {
   const [regenLoading, setRegenLoading] = useState(false);
   const [error, setError] = useState(null);
   const [attempt, setAttempt] = useState(0);
+  const [done, setDone] = useState(false);
 
   const fetchReplies = async ({ isRegen = false } = {}) => {
     if (isRegen) setRegenLoading(true);
-    else { setLoading(true); setReplies([]); setAttempt(0); }
+    else { setLoading(true); setReplies([]); setAttempt(0); setDone(false); }
     setError(null);
     try {
       const data = await generateReplies({ receivedMsg, context, style });
@@ -64,44 +65,91 @@ export default function ReplyTab({ style }) {
 
       {replies.length > 0 && (
         <div className="fade-in" style={{ marginTop: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <p style={{ fontSize: 12, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              👍 Clique pour copier · ✏️ Modifier · 👍👎 Donner un avis
+          {/* Barre d'actions persistante */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10 }}>
+            <p style={{ fontSize: 12, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>
+              📋 Copier · ✏️ Modifier · 👍👎 Avis
             </p>
-            {attempt > 0 && (
-              <span style={{ fontSize: 11, color: "#475569" }}>Tentative {attempt + 1}</span>
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {attempt > 0 && (
+                <span style={{ fontSize: 11, color: "#475569" }}>Tentative {attempt + 1}</span>
+              )}
+              <button
+                onClick={() => setDone(true)}
+                style={{
+                  background: done ? "rgba(16,185,129,0.15)" : "linear-gradient(135deg, rgba(16,185,129,0.2), rgba(16,185,129,0.1))",
+                  border: `1px solid ${done ? "#10b981" : "rgba(16,185,129,0.4)"}`,
+                  borderRadius: 10, padding: "6px 14px",
+                  fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 13,
+                  color: "#10b981", cursor: done ? "default" : "pointer",
+                  transition: "all 0.2s", whiteSpace: "nowrap",
+                }}
+              >
+                {done ? "✓ Message envoyé !" : "✅ Message trouvé !"}
+              </button>
+            </div>
           </div>
 
-          {sorted.map((r, i) => (
-            <ReplyCard
-              key={`${attempt}-${i}`}
-              rank={i + 1}
-              reply={r}
-              receivedMsg={receivedMsg}
-              styleId={style.id}
-            />
-          ))}
+          {/* Suggestions — masquées si done */}
+          {!done && (
+            <>
+              {sorted.map((r, i) => (
+                <ReplyCard
+                  key={`${attempt}-${i}`}
+                  rank={i + 1}
+                  reply={r}
+                  receivedMsg={receivedMsg}
+                  styleId={style.id}
+                />
+              ))}
 
-          {/* Régénérer */}
-          <button
-            onClick={() => fetchReplies({ isRegen: true })}
-            disabled={regenLoading}
-            style={{
-              width: "100%", marginTop: 6,
-              background: "none",
-              border: "1px solid #2a2a3e",
-              borderRadius: 12, padding: "11px 0",
-              fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14,
-              color: regenLoading ? "#475569" : "#94a3b8",
-              cursor: regenLoading ? "not-allowed" : "pointer",
-              transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-            }}
-            onMouseEnter={e => { if (!regenLoading) { e.currentTarget.style.borderColor = "#e879f9"; e.currentTarget.style.color = "#f8fafc"; }}}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2a3e"; e.currentTarget.style.color = regenLoading ? "#475569" : "#94a3b8"; }}
-          >
-            {regenLoading ? <><Spinner />Génération...</> : "🔄 Générer 5 nouvelles réponses"}
-          </button>
+              <button
+                onClick={() => fetchReplies({ isRegen: true })}
+                disabled={regenLoading}
+                style={{
+                  width: "100%", marginTop: 6,
+                  background: "none",
+                  border: "1px solid #2a2a3e",
+                  borderRadius: 12, padding: "11px 0",
+                  fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 14,
+                  color: regenLoading ? "#475569" : "#94a3b8",
+                  cursor: regenLoading ? "not-allowed" : "pointer",
+                  transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                }}
+                onMouseEnter={e => { if (!regenLoading) { e.currentTarget.style.borderColor = "#e879f9"; e.currentTarget.style.color = "#f8fafc"; }}}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2a3e"; e.currentTarget.style.color = regenLoading ? "#475569" : "#94a3b8"; }}
+              >
+                {regenLoading ? <><Spinner />Génération...</> : "🔄 Générer 5 nouvelles réponses"}
+              </button>
+            </>
+          )}
+
+          {/* État "done" */}
+          {done && (
+            <div className="fade-in" style={{
+              background: "linear-gradient(135deg, #0a1f10, #0a1a0f)",
+              border: "1px solid rgba(16,185,129,0.3)",
+              borderRadius: 16, padding: "28px 20px", textAlign: "center",
+            }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>🎉</div>
+              <p style={{ fontWeight: 700, fontSize: 16, color: "#10b981", marginBottom: 6 }}>
+                Bonne chance !
+              </p>
+              <p style={{ fontSize: 13, color: "#475569" }}>
+                Reviens me voir pour le prochain message.
+              </p>
+              <button
+                onClick={() => { setReplies([]); setReceivedMsg(""); setContext(""); setDone(false); setAttempt(0); }}
+                style={{
+                  marginTop: 18, background: "#1e1e2e", border: "1px solid #2a2a3e",
+                  borderRadius: 10, padding: "9px 20px", cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, color: "#94a3b8",
+                }}
+              >
+                Nouveau message
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
