@@ -1,9 +1,11 @@
 export const STYLES = [
-  { id: "humour",     label: "Humour",     emoji: "😏", desc: "Blagues, taquineries, légèreté" },
-  { id: "romantique", label: "Romantique", emoji: "🌹", desc: "Douceur, sincérité, poésie" },
-  { id: "direct",     label: "Direct",     emoji: "🎯", desc: "Franc du collier, confiant" },
-  { id: "mysterieux", label: "Mystérieux", emoji: "🌙", desc: "Intrigue, profondeur, subtilité" },
-  { id: "chill",      label: "Chill",      emoji: "🌊", desc: "Détendu, naturel, spontané" },
+  { id: "humour",      label: "Humour",      emoji: "😏", desc: "Blagues, taquineries, légèreté" },
+  { id: "romantique",  label: "Romantique",  emoji: "🌹", desc: "Douceur, sincérité, poésie" },
+  { id: "direct",      label: "Direct",      emoji: "🎯", desc: "Franc du collier, confiant" },
+  { id: "mysterieux",  label: "Mystérieux",  emoji: "🌙", desc: "Intrigue, profondeur, subtilité" },
+  { id: "chill",       label: "Chill",       emoji: "🌊", desc: "Détendu, naturel, spontané" },
+  { id: "disketteur",  label: "Disketteur",  emoji: "💿", desc: "Maître de la disquette — charme fluide, audacieux, jamais lourd" },
+  { id: "varie",       label: "Varié",       emoji: "🎭", desc: "Mélange de styles selon ce qui colle : humour, charme, mystère, direct..." },
 ];
 
 export const CATEGORIES = {
