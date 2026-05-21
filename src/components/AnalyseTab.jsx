@@ -9,6 +9,7 @@ export default function AnalyseTab({ style, onUseAccroche }) {
   const [profileDesc, setProfileDesc] = useState("");
   const [result, setResult]         = useState(null);
   const [loading, setLoading]       = useState(false);
+  const [regenLoading, setRegenLoading] = useState(false);
   const [error, setError]           = useState(null);
 
   const handleAnalyse = async () => {
@@ -22,6 +23,19 @@ export default function AnalyseTab({ style, onUseAccroche }) {
       setError(e.message);
     }
     setLoading(false);
+  };
+
+  const handleRegen = async () => {
+    setRegenLoading(true);
+    setError(null);
+    try {
+      const data = await analyseProfile({ profileDesc, platform, style });
+      // Remplace uniquement les accroches, garde l'impression
+      setResult(prev => ({ ...prev, accroches: data.accroches }));
+    } catch (e) {
+      setError(e.message);
+    }
+    setRegenLoading(false);
   };
 
   return (
@@ -84,14 +98,34 @@ export default function AnalyseTab({ style, onUseAccroche }) {
             )}
           </div>
 
-          {/* Accroches */}
-          <p style={{ fontSize: 12, color: "#64748b", marginBottom: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            📋 Copier · 👍👎 Avis · ✅ Utiliser → crée une conversation
-          </p>
+          {/* Accroches header */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <p style={{ fontSize: 12, color: "#64748b", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              📋 Copier · 👍👎 Avis · ✅ Utiliser
+            </p>
+            <button
+              onClick={handleRegen}
+              disabled={regenLoading}
+              style={{
+                background: "none", border: "1px solid #2a2a3e",
+                borderRadius: 10, padding: "6px 14px",
+                fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13,
+                color: regenLoading ? "#475569" : "#94a3b8",
+                cursor: regenLoading ? "not-allowed" : "pointer",
+                transition: "all 0.2s", display: "flex", alignItems: "center", gap: 6,
+              }}
+              onMouseEnter={e => { if (!regenLoading) { e.currentTarget.style.borderColor = "#e879f9"; e.currentTarget.style.color = "#f8fafc"; }}}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#2a2a3e"; e.currentTarget.style.color = regenLoading ? "#475569" : "#94a3b8"; }}
+            >
+              {regenLoading
+                ? <><span style={{ width:12,height:12,border:"2px solid #ffffff33",borderTopColor:"#94a3b8",borderRadius:"50%",animation:"spin 0.8s linear infinite",display:"inline-block" }} />Génération...</>
+                : "🔄 Nouvelles accroches"}
+            </button>
+          </div>
 
           {result.accroches?.map((a, i) => (
             <AccrocheCard
-              key={i}
+              key={`${i}-${a.texte}`}
               accroche={a}
               profileDesc={profileDesc}
               styleId={style.id}

@@ -3,19 +3,26 @@ import { saveExample } from "../lib/examples.js";
 import { Badge, ScoreBar } from "./UI.jsx";
 
 export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccroche }) {
-  const [feedback, setFeedback]       = useState(null); // 'like' | 'dislike'
-  const [comment, setComment]         = useState("");
+  const [feedback, setFeedback]         = useState(null);
+  const [comment, setComment]           = useState("");
   const [commentSaved, setCommentSaved] = useState(false);
-  const [isEditing, setIsEditing]     = useState(false);
-  const [editText, setEditText]       = useState(accroche.texte);
-  const [editSaved, setEditSaved]     = useState(false);
-  const [copied, setCopied]           = useState(false);
-  const [usedLoading, setUsedLoading] = useState(false);
+  const [isEditing, setIsEditing]       = useState(false);
+  const [editText, setEditText]         = useState(accroche.texte);
+  const [editSuite, setEditSuite]       = useState(accroche.suite || "");
+  const [editSaved, setEditSaved]       = useState(false);
+  const [copied, setCopied]             = useState(false);
+  const [usedLoading, setUsedLoading]   = useState(false);
 
-  const displayText = editSaved ? editText : accroche.texte;
+  const isBombe     = accroche.categorie === "bombe";
+  const displayText = editSaved ? editText  : accroche.texte;
+  const displaySuite= editSaved ? editSuite : (accroche.suite || "");
+
+  const fullTextForCopy = isBombe && displaySuite
+    ? `${displayText}\n\n↳ (après sa réponse) : ${displaySuite}`
+    : displayText;
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(displayText);
+    navigator.clipboard.writeText(fullTextForCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -26,7 +33,7 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
     await saveExample({
       type: "accroche",
       context: profileDesc,
-      response: accroche.texte,
+      response: fullTextForCopy,
       style: styleId,
       rating: 5,
       note: "👍 Aimé via l'app",
@@ -41,10 +48,13 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
 
   const handleSaveEdit = async () => {
     if (!editText.trim()) return;
+    const saved = isBombe && editSuite
+      ? `${editText.trim()}\n\n↳ (après sa réponse) : ${editSuite.trim()}`
+      : editText.trim();
     await saveExample({
       type: "accroche",
       context: profileDesc,
-      response: editText.trim(),
+      response: saved,
       style: styleId,
       rating: 5,
       note: "✏️ Modifié et approuvé",
@@ -88,21 +98,69 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
         <ScoreBar score={accroche.score} />
 
         {isEditing ? (
-          <textarea
-            className="field"
-            value={editText}
-            onChange={e => setEditText(e.target.value)}
-            rows={3}
-            style={{ marginTop: 10, fontSize: 14, lineHeight: 1.6 }}
-            autoFocus
-          />
+          <>
+            <textarea
+              className="field"
+              value={editText}
+              onChange={e => setEditText(e.target.value)}
+              rows={2}
+              style={{ marginTop: 10, fontSize: 14, lineHeight: 1.6 }}
+              autoFocus
+              placeholder="Message d'accroche..."
+            />
+            {isBombe && (
+              <textarea
+                className="field"
+                value={editSuite}
+                onChange={e => setEditSuite(e.target.value)}
+                rows={2}
+                style={{ marginTop: 8, fontSize: 14, lineHeight: 1.6 }}
+                placeholder="La révélation (après sa réponse)..."
+              />
+            )}
+          </>
         ) : (
           <>
-            <p style={{ fontSize: 14, color: "#e2e8f0", margin: "10px 0 0", lineHeight: 1.6 }}>
-              "{displayText}"
-            </p>
+            {/* Affichage normal */}
+            {isBombe ? (
+              <div style={{ marginTop: 10 }}>
+                {/* Message 1 */}
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: "#7c3aed",
+                    background: "#ede9fe", borderRadius: 4, padding: "2px 6px",
+                    flexShrink: 0, marginTop: 2,
+                  }}>1</span>
+                  <p style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.6, margin: 0 }}>
+                    "{displayText}"
+                  </p>
+                </div>
+                {/* Flèche */}
+                <div style={{ fontSize: 11, color: "#475569", marginLeft: 28, marginBottom: 6, fontStyle: "italic" }}>
+                  ↓ elle répond ("??" / "comment ça ?" / "laquelle ?")
+                </div>
+                {/* Message 2 */}
+                {displaySuite && (
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, color: "#7c3aed",
+                      background: "#ede9fe", borderRadius: 4, padding: "2px 6px",
+                      flexShrink: 0, marginTop: 2,
+                    }}>2</span>
+                    <p style={{ fontSize: 14, color: "#c4b5fd", lineHeight: 1.6, margin: 0, fontStyle: "italic" }}>
+                      "{displaySuite}"
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p style={{ fontSize: 14, color: "#e2e8f0", margin: "10px 0 0", lineHeight: 1.6 }}>
+                "{displayText}"
+              </p>
+            )}
+
             {accroche.strategie && (
-              <p style={{ fontSize: 12, color: "#64748b", fontStyle: "italic", marginTop: 6 }}>
+              <p style={{ fontSize: 12, color: "#64748b", fontStyle: "italic", marginTop: 8 }}>
                 💡 {accroche.strategie}
               </p>
             )}
@@ -120,7 +178,7 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
             cursor: editText.trim() ? "pointer" : "not-allowed",
             opacity: editText.trim() ? 1 : 0.5,
           }}>💾 Sauvegarder</button>
-          <button onClick={() => { setIsEditing(false); setEditText(editSaved ? editText : accroche.texte); }} style={{
+          <button onClick={() => { setIsEditing(false); setEditText(accroche.texte); setEditSuite(accroche.suite || ""); }} style={{
             background: "#1e1e2e", border: "1px solid #2a2a3e", color: "#94a3b8",
             padding: "8px 14px", borderRadius: 8,
             fontFamily: "'DM Sans', sans-serif", fontSize: 13, cursor: "pointer",
@@ -153,14 +211,13 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
         </p>
       )}
 
-      {/* Footer actions */}
+      {/* Footer */}
       {!isEditing && (
         <div style={{
           borderTop: "1px solid #1a1a2a",
           padding: "8px 12px 10px",
           display: "flex", alignItems: "center", gap: 2,
         }}>
-          {/* Like */}
           <button onClick={handleLike} title="Bonne accroche" style={{
             background: feedback === "like" ? "rgba(16,185,129,0.15)" : "none",
             border: `1px solid ${feedback === "like" ? "rgba(16,185,129,0.4)" : "transparent"}`,
@@ -169,7 +226,6 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
             transition: "all 0.2s", lineHeight: 1,
           }}>👍</button>
 
-          {/* Dislike */}
           <button onClick={handleDislike} title="Mauvaise accroche" style={{
             background: feedback === "dislike" ? "rgba(239,68,68,0.15)" : "none",
             border: `1px solid ${feedback === "dislike" ? "rgba(239,68,68,0.4)" : "transparent"}`,
@@ -177,9 +233,8 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
             cursor: "pointer", transition: "all 0.2s", lineHeight: 1,
           }}>👎</button>
 
-          {/* Edit pencil */}
           {!editSaved ? (
-            <button onClick={() => setIsEditing(true)} title="Modifier l'accroche" style={{
+            <button onClick={() => setIsEditing(true)} title="Modifier" style={{
               background: "none", border: "1px solid transparent",
               borderRadius: 8, padding: "5px 10px", cursor: "pointer",
               fontSize: 15, color: "#475569", transition: "all 0.2s", lineHeight: 1,
@@ -193,7 +248,6 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
 
           <div style={{ flex: 1 }} />
 
-          {/* Utiliser cette accroche */}
           <button
             onClick={handleUse}
             disabled={usedLoading}
@@ -208,7 +262,7 @@ export default function AccrocheCard({ accroche, profileDesc, styleId, onUseAccr
             onMouseEnter={e => { if (!usedLoading) e.currentTarget.style.background = "linear-gradient(135deg, rgba(232,121,249,0.3), rgba(244,63,94,0.25))"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "linear-gradient(135deg, rgba(232,121,249,0.2), rgba(244,63,94,0.15))"; }}
           >
-            {usedLoading ? "⏳ Création..." : "✅ Utiliser cette accroche →"}
+            {usedLoading ? "⏳..." : "✅ Utiliser →"}
           </button>
         </div>
       )}

@@ -17,6 +17,8 @@ export const CATEGORIES = {
   appat:      { color: "#f97316", bg: "#ffedd5" },
   intrigue:   { color: "#a855f7", bg: "#f3e8ff" },
   observateur:{ color: "#14b8a6", bg: "#ccfbf1" },
+  piege:      { color: "#dc2626", bg: "#fee2e2" },
+  bombe:      { color: "#7c3aed", bg: "#ede9fe" },
 };
 
 export const PLATFORMS = ["hinge", "tinder", "instagram", "autre"];
