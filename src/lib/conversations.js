@@ -28,6 +28,16 @@ export async function renameConversation(id, name) {
   return res.json();
 }
 
+// Ajouter un seul message
+export async function addMessage(id, role, text) {
+  const res = await fetch(`/api/conversations/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: { role, text } }),
+  });
+  return res.json();
+}
+
 // Ajouter un échange (message reçu + réponse choisie) d'un coup
 export async function addExchange(id, receivedText, sentText) {
   const res = await fetch(`/api/conversations/${id}`, {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { STYLES } from "./lib/constants.js";
+import { createConversation, addMessage } from "./lib/conversations.js";
 import AnalyseTab from "./components/AnalyseTab.jsx";
 import ReplyTab from "./components/ReplyTab.jsx";
 import TrainTab from "./components/TrainTab.jsx";
@@ -16,6 +17,17 @@ export default function App() {
   const [tab, setTab] = useState("reply");
   const [flairStyle, setFlairStyle] = useState("humour");
   const currentStyle = STYLES.find(s => s.id === flairStyle);
+  const [pendingConvId, setPendingConvId] = useState(null);
+
+  // Appelé depuis AnalyseTab quand l'user valide une accroche
+  const handleUseAccroche = async (accrocheText, profileDesc) => {
+    // Nom de la conv = premiers mots du profil
+    const convName = profileDesc.trim().split(/\s+/).slice(0, 4).join(" ") || "Nouvelle conv";
+    const conv = await createConversation(convName);
+    await addMessage(conv.id, "sent", accrocheText);
+    setPendingConvId(conv.id);
+    setTab("reply");
+  };
 
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", fontFamily: "'DM Sans', sans-serif", color: "#f8fafc" }}>
@@ -197,8 +209,8 @@ export default function App() {
 
         {/* Main content */}
         <div className="main-content">
-          {tab === "analyse" && <AnalyseTab style={currentStyle} />}
-          {tab === "reply"   && <ReplyTab   style={currentStyle} />}
+          {tab === "analyse" && <AnalyseTab style={currentStyle} onUseAccroche={handleUseAccroche} />}
+          {tab === "reply"   && <ReplyTab   style={currentStyle} initialConvId={pendingConvId} onConvLoaded={() => setPendingConvId(null)} />}
           {tab === "train"   && <TrainTab />}
           {tab === "style"   && <StyleTab flairStyle={flairStyle} setFlairStyle={setFlairStyle} />}
         </div>

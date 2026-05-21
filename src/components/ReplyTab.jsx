@@ -4,7 +4,7 @@ import { addExchange, createConversation, getConversation, getConversations } fr
 import { ReplyCard, Spinner } from "./UI.jsx";
 import ConversationList from "./ConversationList.jsx";
 
-export default function ReplyTab({ style }) {
+export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
   // ── Conversations ──────────────────────────────────────────────────────────
   const [convList, setConvList]         = useState([]);
   const [activeConvId, setActiveConvId] = useState(null);
@@ -35,6 +35,13 @@ export default function ReplyTab({ style }) {
   };
 
   useEffect(() => { refreshList(); }, []);
+
+  // Ouvre automatiquement la conversation créée depuis AnalyseTab
+  useEffect(() => {
+    if (!initialConvId) return;
+    setActiveConvId(initialConvId);
+    onConvLoaded?.();
+  }, [initialConvId]);
 
   // ── Load full conversation when selection changes ──────────────────────────
   useEffect(() => {
