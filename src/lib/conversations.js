@@ -1,22 +1,27 @@
 // conversations.js — Gestion des conversations persistantes
 
-export async function getConversations() {
-  const res = await fetch("/api/conversations");
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (!res.ok) throw new Error(`API ${path} → ${res.status}`);
   return res.json();
+}
+
+export async function getConversations() {
+  return api("/api/conversations");
 }
 
 export async function getConversation(id) {
-  const res = await fetch(`/api/conversations/${id}`);
-  return res.json();
+  return api(`/api/conversations/${id}`);
 }
 
 export async function createConversation(name = "Nouvelle conversation") {
-  const res = await fetch("/api/conversations", {
+  return api("/api/conversations", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
   });
-  return res.json();
 }
 
 export async function renameConversation(id, name) {

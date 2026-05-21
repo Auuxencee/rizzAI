@@ -24,13 +24,20 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
 
   const historyEndRef = useRef(null);
 
+  const [apiError, setApiError] = useState(null);
+
   // ── Load conversations list ────────────────────────────────────────────────
   const refreshList = async (deletedId = null) => {
-    const list = await getConversations();
-    setConvList(list);
-    if (deletedId && deletedId === activeConvId) {
-      setActiveConvId(null);
-      setActiveConv(null);
+    try {
+      const list = await getConversations();
+      setConvList(list);
+      setApiError(null);
+      if (deletedId && deletedId === activeConvId) {
+        setActiveConvId(null);
+        setActiveConv(null);
+      }
+    } catch {
+      setApiError("Serveur API non disponible — relance avec npm run dev");
     }
   };
 
@@ -46,14 +53,17 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
   // ── Load full conversation when selection changes ──────────────────────────
   useEffect(() => {
     if (!activeConvId) { setActiveConv(null); return; }
-    getConversation(activeConvId).then(c => {
-      setActiveConv(c);
-      setReplies([]);
-      setReceivedMsg("");
-      setContext("");
-      setDone(false);
-      setChosenReply(null);
-    });
+    getConversation(activeConvId)
+      .then(c => {
+        setActiveConv(c);
+        setReplies([]);
+        setReceivedMsg("");
+        setContext("");
+        setDone(false);
+        setChosenReply(null);
+        setApiError(null);
+      })
+      .catch(() => setApiError("Impossible de charger la conversation — serveur API inaccessible"));
   }, [activeConvId]);
 
   // ── Auto-scroll message history ────────────────────────────────────────────
@@ -63,9 +73,13 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
 
   // ── Create new conversation ────────────────────────────────────────────────
   const handleCreate = async () => {
-    const conv = await createConversation("Nouvelle conversation");
-    await refreshList();
-    setActiveConvId(conv.id);
+    try {
+      const conv = await createConversation("Nouvelle conversation");
+      await refreshList();
+      setActiveConvId(conv.id);
+    } catch {
+      setApiError("Impossible de créer une conversation — le serveur API n'est pas lancé. Relance avec npm run dev");
+    }
   };
 
   // ── Generate replies ───────────────────────────────────────────────────────
@@ -134,7 +148,19 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
 
-        {/* Toggle sidebar + conv name */}
+        {/* API error banner */}
+      {apiError && (
+        <div style={{
+          background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
+          borderRadius: 10, padding: "10px 14px", marginBottom: 14,
+          fontSize: 13, color: "#f87171", display: "flex", gap: 8, alignItems: "center",
+        }}>
+          <span>⚠️</span>
+          <span>{apiError}</span>
+        </div>
+      )}
+
+      {/* Toggle sidebar + conv name */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <button
             onClick={() => setShowSidebar(s => !s)}
