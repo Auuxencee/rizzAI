@@ -68,16 +68,6 @@ export function getExamplesForPrompt(type, style, limit = 4) {
 function getDefaultExamples() {
   return [
     {
-      id: "default_1",
-      type: "accroche",
-      context: "Léa, 24 ans. Bio: accro au café et aux randos. Photos en montagne avec son chien.",
-      response: "T'as l'air du genre à gravir des sommets juste pour avoir une meilleure vue sur le prochain café 😄 C'est quoi ta montagne préférée ?",
-      style: "humour",
-      rating: 5,
-      note: "Elle a répondu direct et on a parlé 2h",
-      createdAt: "2025-01-01T00:00:00.000Z",
-    },
-    {
       id: "default_2",
       type: "reply",
       context: "Message reçu: 'Salut, tu fais quoi dans la vie ?'",
