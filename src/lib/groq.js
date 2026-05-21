@@ -39,8 +39,8 @@ function parseJSON(text) {
   return JSON.parse(clean);
 }
 
-function buildExamplesBlock(type, style) {
-  const examples = getExamplesForPrompt(type, style, 4);
+async function buildExamplesBlock(type, style) {
+  const examples = await getExamplesForPrompt(type, style, 4);
   if (examples.length === 0) return "";
 
   const lines = examples.map(e =>
@@ -52,7 +52,7 @@ function buildExamplesBlock(type, style) {
 // ─── Analyse de profil ────────────────────────────────────────────────────────
 
 export async function analyseProfile({ profileDesc, platform, style }) {
-  const examplesBlock = buildExamplesBlock("accroche", style.id);
+  const examplesBlock = await buildExamplesBlock("accroche", style.id);
 
   const system = `Tu es un expert en séduction moderne, drôle et bienveillant. Tu analyses des profils de dating pour générer des accroches percutantes et personnalisées. Style demandé : ${style.label} (${style.desc}).${examplesBlock}
 
@@ -69,7 +69,7 @@ Scores entre 0 et 1. 3 à 4 accroches variées, originales, jamais génériques.
 // ─── Génération de réponses ───────────────────────────────────────────────────
 
 export async function generateReplies({ receivedMsg, context, style }) {
-  const examplesBlock = buildExamplesBlock("reply", style.id);
+  const examplesBlock = await buildExamplesBlock("reply", style.id);
 
   const system = `Tu es un coach en séduction moderne, expert en communication romantique et naturelle. Style demandé : ${style.label} (${style.desc}).${examplesBlock}
 

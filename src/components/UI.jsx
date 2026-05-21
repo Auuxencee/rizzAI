@@ -66,10 +66,10 @@ export function ReplyCard({ rank, reply, receivedMsg, styleId }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleLike = () => {
+  const handleLike = async () => {
     if (feedback === "like") return;
     setFeedback("like");
-    saveExample({
+    await saveExample({
       type: "reply",
       context: `Message reçu: "${receivedMsg}"`,
       response: reply.texte,
@@ -92,9 +92,9 @@ export function ReplyCard({ rank, reply, receivedMsg, styleId }) {
 
   const handleSaveComment = () => setCommentSaved(true);
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editText.trim()) return;
-    saveExample({
+    await saveExample({
       type: "reply",
       context: `Message reçu: "${receivedMsg}"`,
       response: editText.trim(),

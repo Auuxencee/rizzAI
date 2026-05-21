@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getExamples, saveExample, deleteExample } from "../lib/examples.js";
 import { STYLES } from "../lib/constants.js";
 import { StarRating } from "./UI.jsx";
 
 export default function TrainTab() {
-  const [examples, setExamples] = useState(getExamples());
+  const [examples, setExamples] = useState([]);
   const [form, setForm] = useState({
     type: "reply",
     context: "",
@@ -16,17 +16,21 @@ export default function TrainTab() {
   const [saved, setSaved] = useState(false);
   const [filter, setFilter] = useState("all");
 
-  const handleSave = () => {
+  useEffect(() => {
+    getExamples().then(setExamples);
+  }, []);
+
+  const handleSave = async () => {
     if (!form.context.trim() || !form.response.trim()) return;
-    const updated = saveExample(form);
+    const updated = await saveExample(form);
     setExamples(updated);
     setForm({ type: "reply", context: "", response: "", style: "humour", rating: 4, note: "" });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const handleDelete = (id) => {
-    const updated = deleteExample(id);
+  const handleDelete = async (id) => {
+    const updated = await deleteExample(id);
     setExamples(updated);
   };
 
