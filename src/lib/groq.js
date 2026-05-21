@@ -135,6 +135,36 @@ Scores entre 0 et 1. Catégories : humour, romantique, direct, mysterieux, chill
   return parseJSON(text);
 }
 
+// ─── Évaluation d'un message envoyé ──────────────────────────────────────────
+
+export async function evaluateMessage({ sentMessage, receivedMessage, history = [] }) {
+  const historyBlock = history.length > 1
+    ? `\n\nCONTEXTE (derniers échanges) :\n${
+        history.slice(-6).map(m => `${m.role === "received" ? "👩 Elle" : "🧑 Toi"}: "${m.text}"`).join("\n")
+      }`
+    : "";
+
+  const system = `Tu es un coach en séduction direct et honnête.${historyBlock}
+
+${receivedMessage ? `Elle a dit : "${receivedMessage}"` : "Premier message envoyé."}
+Il a répondu : "${sentMessage}"
+
+Évalue cette réponse. Sois bref et direct.
+
+RÈGLES :
+- Note de 1 à 10 (entier). 8+ = bien, 5-7 = passable, <5 = à revoir
+- "avis" = 1 phrase max 12 mots, directe, commence par le positif ou le négatif selon la note
+- "ameliorations" = tableau de 0, 1 ou 2 pistes concrètes courtes. VIDE si note >= 8
+- "version_amelioree" = une réécriture du message si note < 8, sinon null
+
+Réponds UNIQUEMENT en JSON valide, sans markdown :
+{"note":8,"avis":"...","ameliorations":["..."],"version_amelioree":null}`;
+
+  const user = `Évalue le message.`;
+  const text = await callGroq(system, user);
+  return parseJSON(text);
+}
+
 // ─── Proposition de rencard ───────────────────────────────────────────────────
 
 export async function generateDateProposal({ history = [], style }) {

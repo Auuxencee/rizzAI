@@ -58,6 +58,15 @@ export async function addExchange(id, receivedText, sentText) {
   return res.json();
 }
 
+export async function setConvStatus(id, status) {
+  const res = await fetch(`/api/conversations/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  return res.json();
+}
+
 export async function deleteConversation(id) {
   await fetch(`/api/conversations/${id}`, { method: "DELETE" });
 }

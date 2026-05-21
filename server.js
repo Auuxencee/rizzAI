@@ -68,7 +68,7 @@ app.delete("/api/examples/:id", (req, res) => {
 // GET toutes les conversations (sans les messages pour la liste)
 app.get("/api/conversations", (_req, res) => {
   const list = readConvs().map(c => ({
-    id: c.id, name: c.name,
+    id: c.id, name: c.name, status: c.status || null,
     createdAt: c.createdAt, updatedAt: c.updatedAt,
     messageCount: (c.messages || []).length,
     preview: (c.messages || []).slice(-1)[0]?.text?.slice(0, 60) || "",
@@ -103,8 +103,9 @@ app.put("/api/conversations/:id", (req, res) => {
   const idx = convs.findIndex(c => c.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: "Not found" });
 
-  const { name, message, messages } = req.body;
-  if (name !== undefined) convs[idx].name = name;
+  const { name, message, messages, status } = req.body;
+  if (name   !== undefined) convs[idx].name   = name;
+  if (status !== undefined) convs[idx].status = status;
 
   // Ajout d'un message unique
   if (message) {

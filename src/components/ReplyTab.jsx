@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { generateReplies, generateDateProposal } from "../lib/groq.js";
+import { generateReplies, generateDateProposal, evaluateMessage } from "../lib/groq.js";
 import { saveExample } from "../lib/examples.js";
 import {
   addExchange, addMessage, createConversation,
   getConversation, getConversations, deleteConversation, renameConversation,
+  setConvStatus,
 } from "../lib/conversations.js";
 import { Badge, ScoreBar, Spinner } from "./UI.jsx";
 import ConversationList from "./ConversationList.jsx";
@@ -196,6 +197,13 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
   const [dateLoading, setDateLoading]   = useState(false);
   const [dateError, setDateError]       = useState(null);
 
+  // Évaluation du dernier message envoyé
+  const [lastEval, setLastEval]         = useState(null);
+  const [evalLoading, setEvalLoading]   = useState(false);
+
+  // Forcer la continuation après victoire
+  const [forceMode, setForceMode]       = useState(false);
+
   const bottomRef = useRef(null);
 
   // ── Conversations list ──────────────────────────────────────────────────────
@@ -232,6 +240,8 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
         setOwnReplyText("");
         setDateSection(false);
         setDateProposals([]);
+        setLastEval(null);
+        setForceMode(false);
         const msgs = c.messages || [];
         if (msgs.length === 0) setMode("start");
         else if (msgs[msgs.length - 1].role === "sent") setMode("her_turn");
@@ -278,6 +288,7 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
   // ── Ajouter son message (start "her" ou "her_turn") ────────────────────────
   const handleHerMessage = async () => {
     if (!inputText.trim() || !activeConvId) return;
+    setLastEval(null);
     const updated = await addMessage(activeConvId, "received", inputText.trim());
     setActiveConv(updated);
     setInputText("");
@@ -313,6 +324,8 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
   // ── Choisir une réponse IA ──────────────────────────────────────────────────
   const handleSendReply = async (text) => {
     if (!activeConvId) return;
+    const msgs = activeConv?.messages || [];
+    const lastReceived = [...msgs].reverse().find(m => m.role === "received");
     const updated = await addMessage(activeConvId, "sent", text);
     setActiveConv(updated);
     setReplies([]);
@@ -320,8 +333,21 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
     setOwnReplyText("");
     setDateSection(false);
     setDateProposals([]);
+    setLastEval(null);
     setMode("her_turn");
     await refreshList();
+
+    // Évaluation async — ne bloque pas l'UX
+    setEvalLoading(true);
+    try {
+      const ev = await evaluateMessage({
+        sentMessage: text,
+        receivedMessage: lastReceived?.text || null,
+        history: msgs,
+      });
+      setLastEval(ev);
+    } catch { /* silencieux */ }
+    setEvalLoading(false);
   };
 
   // ── Proposition de rencard ──────────────────────────────────────────────────
@@ -336,6 +362,21 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
     } catch (e) { setDateError(e.message); }
     setDateLoading(false);
   };
+
+  // ── Marquer victoire ────────────────────────────────────────────────────────
+  const handleMarkStatus = async (status) => {
+    if (!activeConvId) return;
+    const newStatus = activeConv?.status === status ? null : status; // toggle
+    try {
+      const updated = await setConvStatus(activeConvId, newStatus);
+      setActiveConv(updated);
+      if (newStatus) setForceMode(false);
+      await refreshList();
+    } catch { setApiError("Impossible de mettre à jour le statut"); }
+  };
+
+  const convStatus = activeConv?.status || null;
+  const isWon = convStatus && !forceMode;
 
   const history = activeConv?.messages || [];
   const lastReceived = [...history].reverse().find(m => m.role === "received");
@@ -375,22 +416,52 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
             : <span style={{ fontSize: 13, color: "#475569", flex: 1 }}>Sélectionne ou crée une conversation</span>
           }
           {activeConv && history.length > 0 && (
-            <button
-              onClick={handleDateProposal}
-              disabled={dateLoading}
-              title="Proposer un rencard"
-              style={{
-                background: dateSection ? "rgba(232,121,249,0.15)" : "#13131f",
-                border: `1px solid ${dateSection ? "rgba(232,121,249,0.5)" : "#2a2a3e"}`,
-                borderRadius: 10, padding: "6px 12px", cursor: "pointer",
-                fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13,
-                color: dateSection ? "#e879f9" : "#94a3b8",
-                display: "flex", alignItems: "center", gap: 6,
-                flexShrink: 0, transition: "all 0.2s",
-              }}
-            >
-              {dateLoading ? <><Spinner />Génération...</> : "🗓️ Rencard"}
-            </button>
+            <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+              {/* Proposer un rencard */}
+              {!isWon && (
+                <button
+                  onClick={handleDateProposal}
+                  disabled={dateLoading}
+                  title="Proposer un rencard"
+                  style={{
+                    background: dateSection ? "rgba(232,121,249,0.15)" : "#13131f",
+                    border: `1px solid ${dateSection ? "rgba(232,121,249,0.5)" : "#2a2a3e"}`,
+                    borderRadius: 10, padding: "6px 12px", cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13,
+                    color: dateSection ? "#e879f9" : "#94a3b8",
+                    display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s",
+                  }}
+                >
+                  {dateLoading ? <><Spinner />...</> : "🗓️ Rencard"}
+                </button>
+              )}
+
+              {/* Victoire : date accepté */}
+              <button
+                onClick={() => handleMarkStatus("date")}
+                title="Date accepté !"
+                style={{
+                  background: convStatus === "date" ? "rgba(16,185,129,0.2)" : "#13131f",
+                  border: `1px solid ${convStatus === "date" ? "#10b981" : "#2a2a3e"}`,
+                  borderRadius: 10, padding: "6px 12px", cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13,
+                  color: convStatus === "date" ? "#10b981" : "#64748b", transition: "all 0.2s",
+                }}
+              >✅ Date</button>
+
+              {/* Victoire : instagram */}
+              <button
+                onClick={() => handleMarkStatus("instagram")}
+                title="Instagram obtenu !"
+                style={{
+                  background: convStatus === "instagram" ? "rgba(249,115,22,0.2)" : "#13131f",
+                  border: `1px solid ${convStatus === "instagram" ? "#f97316" : "#2a2a3e"}`,
+                  borderRadius: 10, padding: "6px 12px", cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13,
+                  color: convStatus === "instagram" ? "#f97316" : "#64748b", transition: "all 0.2s",
+                }}
+              >📸 Insta</button>
+            </div>
           )}
         </div>
 
@@ -446,6 +517,28 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
                 </div>
               ))}
 
+              {/* Victory banner */}
+              {convStatus && (
+                <div style={{
+                  margin: "12px 0", padding: "16px 20px", borderRadius: 16, textAlign: "center",
+                  background: convStatus === "date"
+                    ? "rgba(16,185,129,0.1)" : "rgba(249,115,22,0.1)",
+                  border: `1px solid ${convStatus === "date" ? "rgba(16,185,129,0.3)" : "rgba(249,115,22,0.3)"}`,
+                }}>
+                  <div style={{ fontSize: 32, marginBottom: 6 }}>
+                    {convStatus === "date" ? "🎉" : "📸"}
+                  </div>
+                  <p style={{ fontSize: 15, fontWeight: 700, color: convStatus === "date" ? "#10b981" : "#f97316", margin: 0 }}>
+                    {convStatus === "date" ? "Date accepté — bien joué !" : "Instagram obtenu — GG !"}
+                  </p>
+                  <p style={{ fontSize: 12, color: "#475569", margin: "6px 0 0" }}>
+                    {convStatus === "date"
+                      ? "Objectif atteint. La conversation est archivée."
+                      : "Premier objectif atteint. Continue si tu veux aller plus loin."}
+                  </p>
+                </div>
+              )}
+
               {/* Loading indicator */}
               {(loading || mode === "loading_suggestions") && (
                 <div style={{ display: "flex", justifyContent: "flex-end", paddingLeft: "20%" }}>
@@ -465,8 +558,33 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
             {/* ── Action zone (bottom) ── */}
             <div style={{ flexShrink: 0, paddingTop: 10, borderTop: "1px solid #1e1e2e" }}>
 
+              {/* VICTORY STATE */}
+              {isWon && (
+                <div style={{ textAlign: "center", padding: "16px 0" }}>
+                  <p style={{ fontSize: 13, color: "#475569", marginBottom: 12 }}>
+                    {convStatus === "date"
+                      ? "🎉 Objectif date atteint — tu peux fermer ça !"
+                      : "📸 Instagram obtenu — continue si tu veux aller plus loin."}
+                  </p>
+                  <button
+                    onClick={() => setForceMode(true)}
+                    style={{
+                      background: "none", border: "1px solid #2a2a3e",
+                      borderRadius: 10, padding: "8px 18px", cursor: "pointer",
+                      fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13,
+                      color: "#94a3b8", transition: "all 0.2s",
+                    }}
+                  >Continuer la conversation →</button>
+                </div>
+              )}
+
+              {/* EVAL CARD: feedback sur le dernier message envoyé */}
+              {!isWon && (evalLoading || lastEval) && (
+                <EvalCard eval={lastEval} loading={evalLoading} onDismiss={() => setLastEval(null)} />
+              )}
+
               {/* START: empty conversation */}
-              {mode === "start" && (
+              {!isWon && mode === "start" && (
                 <>
                   {!startWho ? (
                     <div style={{ display: "flex", gap: 10, justifyContent: "center", padding: "16px 0" }}>
@@ -510,7 +628,7 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
               )}
 
               {/* HER TURN: enter her response */}
-              {mode === "her_turn" && (
+              {!isWon && mode === "her_turn" && (
                 <MessageInput
                   value={inputText} onChange={setInputText}
                   placeholder="Sa réponse..."
@@ -520,7 +638,7 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
               )}
 
               {/* PICKING_PENDING: last msg was received, need to generate */}
-              {mode === "picking_pending" && (
+              {!isWon && mode === "picking_pending" && (
                 <div style={{ padding: "12px 0", display: "flex", gap: 10, alignItems: "center" }}>
                   <button className="btn-primary" style={{ flex: 1 }} onClick={() => generateSuggestions()}>
                     🎯 Générer des réponses
@@ -529,7 +647,7 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
               )}
 
               {/* PICKING: show AI suggestions */}
-              {(mode === "picking" || (mode !== "her_turn" && mode !== "start" && mode !== "loading_suggestions" && mode !== "picking_pending" && replies.length > 0)) && (
+              {!isWon && (mode === "picking" || (mode !== "her_turn" && mode !== "start" && mode !== "loading_suggestions" && mode !== "picking_pending" && replies.length > 0)) && (
                 <div style={{ maxHeight: 420, overflowY: "auto", paddingTop: 4 }}>
                   {genError && <p style={{ color: "#ef4444", fontSize: 13, marginBottom: 8 }}>❌ {genError}</p>}
 
@@ -573,7 +691,7 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
               )}
 
               {/* HER TURN: option de réponse libre si les suggestions ne conviennent pas */}
-              {mode === "her_turn" && (
+              {!isWon && mode === "her_turn" && (
                 <OwnReplySection
                   open={ownReplyOpen}
                   value={ownReplyText}
@@ -585,7 +703,7 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
               )}
 
               {/* DATE SECTION: propositions de rencard */}
-              {dateSection && (
+              {!isWon && dateSection && (
                 <div style={{ marginTop: 12, borderTop: "1px solid rgba(232,121,249,0.2)", paddingTop: 12 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: "#e879f9", letterSpacing: "0.05em" }}>
@@ -645,6 +763,74 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Carte évaluation du message envoyé ───────────────────────────────────────
+
+function EvalCard({ eval: ev, loading, onDismiss }) {
+  const [showImproved, setShowImproved] = useState(false);
+
+  const noteColor = !ev ? "#64748b"
+    : ev.note >= 8 ? "#10b981"
+    : ev.note >= 5 ? "#f59e0b"
+    : "#ef4444";
+
+  const noteEmoji = !ev ? "⏳"
+    : ev.note >= 8 ? "🔥"
+    : ev.note >= 5 ? "👌"
+    : "💀";
+
+  return (
+    <div style={{
+      background: "#0f0f1a",
+      border: `1px solid ${noteColor}33`,
+      borderRadius: 12, marginBottom: 10, overflow: "hidden",
+      transition: "all 0.3s",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px" }}>
+        <span style={{ fontSize: 16 }}>{noteEmoji}</span>
+        {loading ? (
+          <span style={{ fontSize: 12, color: "#475569", fontStyle: "italic" }}>Analyse en cours...</span>
+        ) : ev ? (
+          <>
+            <span style={{ fontSize: 13, fontWeight: 700, color: noteColor }}>{ev.note}/10</span>
+            <span style={{ fontSize: 12, color: "#94a3b8", flex: 1 }}>{ev.avis}</span>
+          </>
+        ) : null}
+        <button onClick={onDismiss} style={{ ...iconBtn, fontSize: 12, color: "#475569", padding: "2px 6px" }}>✕</button>
+      </div>
+
+      {!loading && ev && ev.ameliorations?.length > 0 && (
+        <div style={{ padding: "0 12px 10px", borderTop: "1px solid #1a1a2a" }}>
+          <p style={{ fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase", margin: "8px 0 4px", letterSpacing: "0.05em" }}>
+            💡 Pistes d'amélioration
+          </p>
+          {ev.ameliorations.map((a, i) => (
+            <p key={i} style={{ fontSize: 12, color: "#94a3b8", margin: "3px 0" }}>— {a}</p>
+          ))}
+          {ev.version_amelioree && (
+            <>
+              <button
+                onClick={() => setShowImproved(s => !s)}
+                style={{ ...ghostBtn, marginTop: 8, textAlign: "left", fontSize: 12 }}
+              >
+                ✨ {showImproved ? "Masquer" : "Voir"} la version améliorée
+              </button>
+              {showImproved && (
+                <div style={{
+                  background: "rgba(232,121,249,0.08)", border: "1px solid rgba(232,121,249,0.2)",
+                  borderRadius: 10, padding: "10px 12px", marginTop: 8,
+                  fontSize: 13, color: "#f1f5f9", lineHeight: 1.6,
+                }}>
+                  {ev.version_amelioree}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
