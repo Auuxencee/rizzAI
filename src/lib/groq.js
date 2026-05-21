@@ -134,3 +134,36 @@ Scores entre 0 et 1. Catégories : humour, romantique, direct, mysterieux, chill
   const text = await callGroq(system, user);
   return parseJSON(text);
 }
+
+// ─── Proposition de rencard ───────────────────────────────────────────────────
+
+export async function generateDateProposal({ history = [], style }) {
+  const styleInstr = styleInstruction(style);
+
+  const historyBlock = history.length > 0
+    ? `\n\nHISTORIQUE DE LA CONVERSATION :\n${
+        history.map(m => `${m.role === "received" ? "👩 Elle" : "🧑 Toi"}: "${m.text}"`).join("\n")
+      }`
+    : "";
+
+  const system = `Tu es un expert en séduction moderne. ${styleInstr}${historyBlock}
+
+Génère 3 façons de proposer un rencard/date en personne. L'objectif : se voir IRL, de façon charmante et confiante.
+
+RÈGLES ABSOLUES :
+❌ Jamais suppliant, jamais "est-ce que tu voudrais bien...", jamais générique, jamais trop long
+❌ Jamais de point d'interrogation incertain — ça doit sonner comme une évidence, pas une demande
+✅ Court, naturel, comme un vrai SMS — max 2 phrases
+✅ Confiant sans être arrogant : il propose, pas il mendie
+✅ Si la conversation donne des indices (centres d'intérêt, lieu mentionné, blague partagée) → utilise-les pour une proposition contextualisée
+✅ L'idée de lieu/activité peut être précise ou ouverte selon le style
+
+Réponds UNIQUEMENT en JSON valide, sans markdown, sans backticks. Format :
+{"propositions":[{"texte":"...","style":"direct","explication":"..."},{"texte":"...","style":"subtil","explication":"..."},{"texte":"...","style":"humour","explication":"..."}]}
+Explication = max 8 mots sur pourquoi ça marche.`;
+
+  const user = `Génère 3 propositions de rencard naturelles pour cette conversation.`;
+
+  const text = await callGroq(system, user);
+  return parseJSON(text);
+}

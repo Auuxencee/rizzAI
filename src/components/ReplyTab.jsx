@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { generateReplies } from "../lib/groq.js";
+import { generateReplies, generateDateProposal } from "../lib/groq.js";
 import { saveExample } from "../lib/examples.js";
 import {
   addExchange, addMessage, createConversation,
@@ -186,6 +186,16 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
   const [regenLoading, setRegenLoading] = useState(false);
   const [genError, setGenError]       = useState(null);
 
+  // Réponse libre
+  const [ownReplyOpen, setOwnReplyOpen] = useState(false);
+  const [ownReplyText, setOwnReplyText] = useState("");
+
+  // Proposition de rencard
+  const [dateSection, setDateSection]   = useState(false);
+  const [dateProposals, setDateProposals] = useState([]);
+  const [dateLoading, setDateLoading]   = useState(false);
+  const [dateError, setDateError]       = useState(null);
+
   const bottomRef = useRef(null);
 
   // ── Conversations list ──────────────────────────────────────────────────────
@@ -218,6 +228,10 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
         setContextText("");
         setGenError(null);
         setApiError(null);
+        setOwnReplyOpen(false);
+        setOwnReplyText("");
+        setDateSection(false);
+        setDateProposals([]);
         const msgs = c.messages || [];
         if (msgs.length === 0) setMode("start");
         else if (msgs[msgs.length - 1].role === "sent") setMode("her_turn");
@@ -302,8 +316,25 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
     const updated = await addMessage(activeConvId, "sent", text);
     setActiveConv(updated);
     setReplies([]);
+    setOwnReplyOpen(false);
+    setOwnReplyText("");
+    setDateSection(false);
+    setDateProposals([]);
     setMode("her_turn");
     await refreshList();
+  };
+
+  // ── Proposition de rencard ──────────────────────────────────────────────────
+  const handleDateProposal = async () => {
+    setDateSection(true);
+    setDateLoading(true);
+    setDateError(null);
+    setDateProposals([]);
+    try {
+      const data = await generateDateProposal({ history, style });
+      setDateProposals(data.propositions || []);
+    } catch (e) { setDateError(e.message); }
+    setDateLoading(false);
   };
 
   const history = activeConv?.messages || [];
@@ -337,12 +368,30 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
           <button onClick={() => setShowSidebar(s => !s)} style={{
             background: "#13131f", border: "1px solid #1e1e2e",
             borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-            fontSize: 15, color: "#64748b",
+            fontSize: 15, color: "#64748b", flexShrink: 0,
           }}>☰</button>
           {activeConv
-            ? <span style={{ fontSize: 14, fontWeight: 600, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>💬 {activeConv.name}</span>
-            : <span style={{ fontSize: 13, color: "#475569" }}>Sélectionne ou crée une conversation</span>
+            ? <span style={{ fontSize: 14, fontWeight: 600, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>💬 {activeConv.name}</span>
+            : <span style={{ fontSize: 13, color: "#475569", flex: 1 }}>Sélectionne ou crée une conversation</span>
           }
+          {activeConv && history.length > 0 && (
+            <button
+              onClick={handleDateProposal}
+              disabled={dateLoading}
+              title="Proposer un rencard"
+              style={{
+                background: dateSection ? "rgba(232,121,249,0.15)" : "#13131f",
+                border: `1px solid ${dateSection ? "rgba(232,121,249,0.5)" : "#2a2a3e"}`,
+                borderRadius: 10, padding: "6px 12px", cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif", fontWeight: 600, fontSize: 13,
+                color: dateSection ? "#e879f9" : "#94a3b8",
+                display: "flex", alignItems: "center", gap: 6,
+                flexShrink: 0, transition: "all 0.2s",
+              }}
+            >
+              {dateLoading ? <><Spinner />Génération...</> : "🗓️ Rencard"}
+            </button>
+          )}
         </div>
 
         {apiError && (
@@ -511,12 +560,126 @@ export default function ReplyTab({ style, initialConvId, onConvLoaded }) {
                       onSend={handleSendReply}
                     />
                   ))}
+
+                  {/* Réponse libre */}
+                  <OwnReplySection
+                    open={ownReplyOpen}
+                    value={ownReplyText}
+                    onChange={setOwnReplyText}
+                    onToggle={() => { setOwnReplyOpen(o => !o); setOwnReplyText(""); }}
+                    onSend={() => { handleSendReply(ownReplyText); }}
+                  />
+                </div>
+              )}
+
+              {/* HER TURN: option de réponse libre si les suggestions ne conviennent pas */}
+              {mode === "her_turn" && (
+                <OwnReplySection
+                  open={ownReplyOpen}
+                  value={ownReplyText}
+                  onChange={setOwnReplyText}
+                  onToggle={() => { setOwnReplyOpen(o => !o); setOwnReplyText(""); }}
+                  onSend={() => { handleSendReply(ownReplyText); }}
+                  label="✍️ Envoyer ma propre réponse (sans IA)"
+                />
+              )}
+
+              {/* DATE SECTION: propositions de rencard */}
+              {dateSection && (
+                <div style={{ marginTop: 12, borderTop: "1px solid rgba(232,121,249,0.2)", paddingTop: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "#e879f9", letterSpacing: "0.05em" }}>
+                      🗓️ Propositions de rencard
+                    </span>
+                    <button
+                      onClick={() => { setDateSection(false); setDateProposals([]); }}
+                      style={{ ...iconBtn, fontSize: 12, color: "#475569" }}
+                    >✕</button>
+                  </div>
+
+                  {dateLoading && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#e879f9", fontSize: 13 }}>
+                      <Spinner />Génération en cours...
+                    </div>
+                  )}
+                  {dateError && <p style={{ color: "#ef4444", fontSize: 13 }}>❌ {dateError}</p>}
+
+                  {dateProposals.map((p, i) => (
+                    <div key={i} style={{
+                      background: "rgba(232,121,249,0.06)",
+                      border: "1px solid rgba(232,121,249,0.2)",
+                      borderRadius: 14, marginBottom: 8, overflow: "hidden",
+                    }}>
+                      <div style={{ padding: "12px 14px 8px" }}>
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+                          letterSpacing: "0.08em", color: "#e879f9", marginBottom: 6, display: "block",
+                        }}>{p.style}</span>
+                        <p style={{ fontSize: 14, color: "#f1f5f9", lineHeight: 1.6, margin: "4px 0 0" }}>{p.texte}</p>
+                        {p.explication && (
+                          <p style={{ fontSize: 11, color: "#64748b", fontStyle: "italic", marginTop: 4 }}>{p.explication}</p>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 10px 8px", borderTop: "1px solid rgba(232,121,249,0.1)" }}>
+                        <button
+                          onClick={() => handleSendReply(p.texte)}
+                          style={{
+                            background: "linear-gradient(135deg, #e879f9, #f43f5e)",
+                            border: "none", borderRadius: 10, padding: "7px 16px",
+                            fontFamily: "'DM Sans', sans-serif", fontWeight: 700, fontSize: 13,
+                            color: "white", cursor: "pointer",
+                          }}
+                        >Envoyer →</button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {!dateLoading && dateProposals.length > 0 && (
+                    <button onClick={handleDateProposal} style={{ ...ghostBtn, marginTop: 4 }}>
+                      🔄 Nouvelles propositions
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Section réponse libre ─────────────────────────────────────────────────────
+
+function OwnReplySection({ open, value, onChange, onToggle, onSend, label = "✍️ Écrire ma propre réponse" }) {
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button
+        onClick={onToggle}
+        style={{
+          background: open ? "rgba(232,121,249,0.08)" : "none",
+          border: `1px solid ${open ? "rgba(232,121,249,0.3)" : "#2a2a3e"}`,
+          borderRadius: 10, padding: "7px 14px", width: "100%",
+          cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+          fontSize: 13, fontWeight: 600,
+          color: open ? "#e879f9" : "#64748b",
+          textAlign: "left", transition: "all 0.2s",
+        }}
+      >{label} {open ? "▲" : "▼"}</button>
+
+      {open && (
+        <div style={{ marginTop: 8 }}>
+          <MessageInput
+            value={value}
+            onChange={onChange}
+            placeholder="Tape ta réponse..."
+            onSubmit={onSend}
+            disabled={!value.trim()}
+            submitLabel="Envoyer →"
+            color="sent"
+          />
+        </div>
+      )}
     </div>
   );
 }
