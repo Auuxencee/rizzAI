@@ -14,6 +14,9 @@ export const CATEGORIES = {
   chill:      { color: "#10b981", bg: "#d1fae5" },
   compliment: { color: "#3b82f6", bg: "#dbeafe" },
   question:   { color: "#06b6d4", bg: "#cffafe" },
+  appat:      { color: "#f97316", bg: "#ffedd5" },
+  intrigue:   { color: "#a855f7", bg: "#f3e8ff" },
+  observateur:{ color: "#14b8a6", bg: "#ccfbf1" },
 };
 
 export const PLATFORMS = ["hinge", "tinder", "instagram", "autre"];

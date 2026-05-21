@@ -49,7 +49,7 @@ export function InfoBox({ children }) {
   );
 }
 
-export function ReplyCard({ rank, reply, receivedMsg, styleId }) {
+export function ReplyCard({ rank, reply, receivedMsg, styleId, onChose }) {
   const [feedback, setFeedback] = useState(null); // 'like' | 'dislike'
   const [comment, setComment] = useState("");
   const [commentSaved, setCommentSaved] = useState(false);
@@ -77,6 +77,7 @@ export function ReplyCard({ rank, reply, receivedMsg, styleId }) {
       rating: 5,
       note: "👍 Aimé via l'app",
     });
+    onChose?.(reply.texte);
   };
 
   const handleDislike = () => {
@@ -104,6 +105,7 @@ export function ReplyCard({ rank, reply, receivedMsg, styleId }) {
     });
     setEditSaved(true);
     setIsEditing(false);
+    onChose?.(editText.trim());
   };
 
   const handleCancelEdit = () => {
