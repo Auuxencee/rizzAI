@@ -1,4 +1,5 @@
 import { getExamplesForPrompt } from "./examples.js";
+import { getCuratedExamples } from "./curatedExamples.js";
 
 const API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL = "llama-3.3-70b-versatile";
@@ -40,12 +41,26 @@ function parseJSON(text) {
 }
 
 async function buildExamplesBlock(type, style) {
-  const examples = await getExamplesForPrompt(type, style, 4);
-  if (examples.length === 0) return "";
-  const lines = examples.map(e =>
+  // Exemples sauvegardés par l'utilisateur (feedback 👍, modifs, etc.) — priorité max
+  const userExamples = await getExamplesForPrompt(type, style, 3);
+
+  // Exemples curatés (Texting Academy) — baseline toujours disponible
+  const curated = getCuratedExamples(type, style, 3);
+
+  // Merge : exemples user en premier (les plus personnalisés), puis curatés
+  // Déduplique par texte de réponse pour éviter les doublons si l'user a sauvegardé un exemple curé
+  const seen = new Set(userExamples.map(e => e.response));
+  const merged = [
+    ...userExamples,
+    ...curated.filter(e => !seen.has(e.response)),
+  ].slice(0, 5);
+
+  if (merged.length === 0) return "";
+
+  const lines = merged.map(e =>
     `- Contexte: "${e.context}"\n  Réponse gagnante (${e.rating}⭐): "${e.response}"`
   );
-  return `\n\nEXEMPLES QUI ONT BIEN MARCHÉ (inspire-toi de ce style) :\n${lines.join("\n")}`;
+  return `\n\nEXEMPLES QUI ONT BIEN MARCHÉ (inspire-toi de ce style et de ce niveau de qualité) :\n${lines.join("\n")}`;
 }
 
 // Description de style enrichie pour le prompt
